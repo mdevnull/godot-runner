@@ -33,19 +33,7 @@ func createListing(e *env) (fyne.CanvasObject, binding.String) {
 
 			runningStatus.SetStatus("starting", statusColorWarn)
 			e.isRunning = true
-			go e.global.BuildSolution(func() {
-				runningStatus.SetStatus("running", statusColorOk)
-				e.start(func() {
-					e.isRunning = false
-					runningStatus.SetStatus("complete", statusColorWaiting)
-				}, func() {
-					e.isRunning = false
-					runningStatus.SetStatus("runtime error", statusColorError)
-				})
-			}, func() {
-				e.isRunning = false
-				runningStatus.SetStatus("build error", statusColorError)
-			})
+			go buildAndRun(e, runningStatus)
 		}),
 		widget.NewButton("Edit", func() {
 			formItems, editBindings := e.createEnvFormItems()
@@ -66,4 +54,23 @@ func createListing(e *env) (fyne.CanvasObject, binding.String) {
 			formDia.Show()
 		}),
 	), nameBinding
+}
+
+func buildAndRun(e *env, runningStatus *statusRect) {
+	e.global.BuildSolution(func() {
+		runningStatus.SetStatus("running", statusColorOk)
+		e.start(func() {
+			e.isRunning = false
+			runningStatus.SetStatus("complete", statusColorWaiting)
+		}, func() {
+			e.isRunning = false
+			runningStatus.SetStatus("runtime error", statusColorError)
+		}, func(bool) {
+			runningStatus.SetStatus("restarting", statusColorWarn)
+			buildAndRun(e, runningStatus)
+		})
+	}, func() {
+		e.isRunning = false
+		runningStatus.SetStatus("build error", statusColorError)
+	})
 }

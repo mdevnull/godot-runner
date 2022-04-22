@@ -20,6 +20,8 @@ type env struct {
 	noWindow        bool
 	debugCollisions bool
 	debugNavigation bool
+	restartOnChange bool
+	restartNext     bool
 }
 
 func createEnv(g *global) *env {
@@ -29,7 +31,7 @@ func createEnv(g *global) *env {
 	}
 }
 
-func (e *env) start(completeFn func(), errorFn func()) {
+func (e *env) start(completeFn func(), errorFn func(), restart func(bool)) {
 	execPath, err := e.global.exeBinding.Get()
 	if err != nil {
 		e.global.errBind.Set("Missing path to executable")
@@ -70,10 +72,19 @@ func (e *env) start(completeFn func(), errorFn func()) {
 	e.currentProcess.Stderr = tmpFile
 
 	if err := e.currentProcess.Run(); err != nil {
-		errorFn()
+		if e.restartNext {
+			restart(false)
+		} else {
+			errorFn()
+		}
 		return
 	}
-	completeFn()
+	if e.restartNext {
+		restart(true)
+	} else {
+		completeFn()
+	}
+
 }
 
 func (e *env) AddListener(listener func()) {

@@ -21,6 +21,24 @@ func Start() {
 	envList := make([]*env, 0)
 	envContainerBox := container.NewVBox()
 
+	var oldWatcherCloser chan<- bool
+	g.projectPathChangeHandler = func(s string) {
+		if s != "" {
+			if oldWatcherCloser != nil {
+				oldWatcherCloser <- true
+			}
+			oldWatcherCloser = g.Watcher(s)
+		}
+	}
+	g.projectFileChangeHandler = func() {
+		for _, e := range envList {
+			if e.isRunning && e.restartOnChange {
+				e.restartNext = true
+				e.currentProcess.Process.Kill()
+			}
+		}
+	}
+
 	win.SetMainMenu(fyne.NewMainMenu(
 		fyne.NewMenu(
 			"File",

@@ -46,18 +46,33 @@ func (e *env) createEnvFormItems() ([]*widget.FormItem, *envFormBindings) {
 		nameBinding.Set(e.name)
 	}
 
+	noWindowCheckbox := widget.NewCheck("Flag", func(b bool) {
+		e.noWindow = b
+	})
+	noWindowCheckbox.SetChecked(e.noWindow)
+
+	debugCollisionCheckbox := widget.NewCheck("Flag", func(b bool) {
+		e.debugCollisions = b
+	})
+	debugCollisionCheckbox.SetChecked(e.debugCollisions)
+
+	debugNavCheckbox := widget.NewCheck("Flag", func(b bool) {
+		e.debugNavigation = b
+	})
+	debugNavCheckbox.SetChecked(e.debugNavigation)
+
+	restartOnFSChange := widget.NewCheck("Flag", func(b bool) {
+		e.restartOnChange = b
+	})
+	restartOnFSChange.SetChecked(e.restartOnChange)
+
 	return []*widget.FormItem{
 		widget.NewFormItem("Name", widget.NewEntryWithData(nameBinding)),
 		sceneItem,
 		widget.NewFormItem("Arguments", argumentsEntry),
-		widget.NewFormItem("Hide Window", widget.NewCheck("Flag", func(b bool) {
-			e.noWindow = b
-		})),
-		widget.NewFormItem("Debug Collisions", widget.NewCheck("Flag", func(b bool) {
-			e.debugCollisions = b
-		})),
-		widget.NewFormItem("Debug Navigation", widget.NewCheck("Flag", func(b bool) {
-			e.debugNavigation = b
-		})),
+		widget.NewFormItem("Hide Window", noWindowCheckbox),
+		widget.NewFormItem("Debug Collisions", debugCollisionCheckbox),
+		widget.NewFormItem("Debug Navigation", debugNavCheckbox),
+		widget.NewFormItem("Restart on file change", restartOnFSChange),
 	}, &envFormBindings{nameBinding, argsBinding, innerBidning}
 }
