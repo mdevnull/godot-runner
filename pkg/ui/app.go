@@ -32,9 +32,12 @@ func Start() {
 				saveProject.Envs = make([]storage.Env, len(envList))
 				for i, e := range envList {
 					saveProject.Envs[i] = storage.Env{
-						Name:      e.name,
-						Scene:     e.scene,
-						Arguments: e.args,
+						Name:            e.name,
+						Scene:           e.scene,
+						Arguments:       e.args,
+						NoWindow:        e.noWindow,
+						DebugCollisions: e.debugCollisions,
+						DebugNavigation: e.debugNavigation,
 					}
 				}
 
@@ -55,6 +58,9 @@ func Start() {
 					newEnv.name = e.Name
 					newEnv.args = e.Arguments
 					newEnv.scene = e.Scene
+					newEnv.noWindow = e.NoWindow
+					newEnv.debugCollisions = e.DebugCollisions
+					newEnv.debugNavigation = e.DebugNavigation
 
 					envList = append(envList, newEnv)
 
@@ -95,6 +101,11 @@ func Start() {
 					})
 				}
 			}, win)
+			s := formDia.MinSize()
+			if s.Width < win.Canvas().Size().Width*0.75 {
+				s.Width = win.Canvas().Size().Width * 0.75
+			}
+			formDia.Resize(s)
 			formDia.Show()
 		}),
 		envContainerBox,

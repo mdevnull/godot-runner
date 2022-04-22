@@ -50,5 +50,14 @@ func (e *env) createEnvFormItems() ([]*widget.FormItem, *envFormBindings) {
 		widget.NewFormItem("Name", widget.NewEntryWithData(nameBinding)),
 		sceneItem,
 		widget.NewFormItem("Arguments", argumentsEntry),
+		widget.NewFormItem("Hide Window", widget.NewCheck("Flag", func(b bool) {
+			e.noWindow = b
+		})),
+		widget.NewFormItem("Debug Collisions", widget.NewCheck("Flag", func(b bool) {
+			e.debugCollisions = b
+		})),
+		widget.NewFormItem("Debug Navigation", widget.NewCheck("Flag", func(b bool) {
+			e.debugNavigation = b
+		})),
 	}, &envFormBindings{nameBinding, argsBinding, innerBidning}
 }

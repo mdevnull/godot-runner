@@ -9,14 +9,17 @@ import (
 )
 
 type env struct {
-	name           string
-	args           string
-	scene          string
-	lastLogFile    *os.File
-	global         *global
-	listeners      []func()
-	isRunning      bool
-	currentProcess *exec.Cmd
+	name            string
+	args            string
+	scene           string
+	lastLogFile     *os.File
+	global          *global
+	listeners       []func()
+	isRunning       bool
+	currentProcess  *exec.Cmd
+	noWindow        bool
+	debugCollisions bool
+	debugNavigation bool
 }
 
 func createEnv(g *global) *env {
@@ -41,6 +44,15 @@ func (e *env) start(completeFn func(), errorFn func()) {
 	customArgs := strings.Split(e.args, " ")
 
 	args := []string{"--path", projectPath, e.scene}
+	if e.noWindow {
+		args = append(args, "--no-window")
+	}
+	if e.debugCollisions {
+		args = append(args, "--debug-collisions")
+	}
+	if e.debugNavigation {
+		args = append(args, "--debug-navigation")
+	}
 	args = append(args, customArgs...)
 
 	// create new empty binding for this run

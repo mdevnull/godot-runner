@@ -58,6 +58,11 @@ func createListing(e *env) (fyne.CanvasObject, binding.String) {
 					e.refresh()
 				}
 			}, e.global.win)
+			s := formDia.MinSize()
+			if s.Width < e.global.win.Canvas().Size().Width*0.75 {
+				s.Width = e.global.win.Canvas().Size().Width * 0.75
+			}
+			formDia.Resize(s)
 			formDia.Show()
 		}),
 	), nameBinding

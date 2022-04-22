@@ -8,9 +8,12 @@ import (
 
 type (
 	Env struct {
-		Name      string `json:"name"`
-		Scene     string `json:"scene"`
-		Arguments string `json:"arguments"`
+		Name            string `json:"name"`
+		Scene           string `json:"scene"`
+		Arguments       string `json:"arguments"`
+		NoWindow        bool   `json:"no_window"`
+		DebugCollisions bool   `json:"debug_collisions"`
+		DebugNavigation bool   `json:"debug_navigation"`
 	}
 	Project struct {
 		ExecPath    string `json:"exec_path"`
