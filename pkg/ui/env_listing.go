@@ -57,8 +57,10 @@ func createListing(e *env) (fyne.CanvasObject, binding.String) {
 }
 
 func buildAndRun(e *env, runningStatus *statusRect) {
-	e.global.BuildSolution(func() {
+	wrappedStart := func() {
+		e.isRunning = true
 		runningStatus.SetStatus("running", statusColorOk)
+
 		e.start(func() {
 			e.isRunning = false
 			runningStatus.SetStatus("complete", statusColorWaiting)
@@ -66,11 +68,27 @@ func buildAndRun(e *env, runningStatus *statusRect) {
 			e.isRunning = false
 			runningStatus.SetStatus("runtime error", statusColorError)
 		}, func(bool) {
-			runningStatus.SetStatus("restarting", statusColorWarn)
 			buildAndRun(e, runningStatus)
 		})
-	}, func() {
-		e.isRunning = false
-		runningStatus.SetStatus("build error", statusColorError)
-	})
+	}
+
+	if !e.global.hasValidBuild {
+		e.global.NextBuildComplete(func(success bool) {
+			e.isRunning = false
+
+			if !success {
+				runningStatus.SetStatus("build error", statusColorError)
+				return
+			}
+
+			wrappedStart()
+
+		})
+
+		runningStatus.SetStatus("build", statusColorWarn)
+		e.global.BuildSolution()
+		return
+	}
+
+	wrappedStart()
 }

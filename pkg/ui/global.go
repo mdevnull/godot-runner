@@ -2,11 +2,13 @@ package ui
 
 import (
 	"log"
-	"os/exec"
+	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
+	"github.com/devnull-twitch/godot-runner/pkg/build"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 )
@@ -16,15 +18,29 @@ type global struct {
 	projectPathBinding       binding.String
 	errBind                  binding.String
 	win                      fyne.Window
+	hasValidBuild            bool
+	buildCom                 *build.RunnerChannels
 	projectPathChangeHandler func(string)
 	projectFileChangeHandler func()
+	listerLock               *sync.Mutex
+	buildCompleteListener    []chan<- bool
 }
 
 func globalForm(errBind binding.String, win fyne.Window) (fyne.Widget, *global) {
+	buildCom := build.Runner()
 	g := &global{
-		errBind: errBind,
-		win:     win,
+		errBind:               errBind,
+		win:                   win,
+		buildCom:              buildCom,
+		buildCompleteListener: make([]chan<- bool, 0),
+		listerLock:            &sync.Mutex{},
 	}
+
+	go func() {
+		for success := range buildCom.BuildCompleteChan() {
+			g.emitBuildComplete(success)
+		}
+	}()
 
 	execFormItem, exeBinding := newFilePickerFormItem("Godot editor", g, nil, nil)
 	g.exeBinding = exeBinding
@@ -39,7 +55,45 @@ func globalForm(errBind binding.String, win fyne.Window) (fyne.Widget, *global) 
 	return widget.NewForm(execFormItem, projectPathItem), g
 }
 
-func (g *global) BuildSolution(complete func(), errFn func()) {
+func (g *global) emitBuildComplete(success bool) {
+	g.hasValidBuild = true
+	for _, c := range g.buildCompleteListener {
+		select {
+		case c <- success:
+		case <-time.After(time.Millisecond * 10):
+			logrus.WithField("timeout", "10ms").Warn("skipped build complete listener")
+		}
+	}
+}
+
+func (g *global) NextBuildComplete(complete func(bool)) {
+	c := make(chan bool)
+	go func() {
+		success := <-c
+		complete(success)
+
+		g.listerLock.Lock()
+		defer g.listerLock.Unlock()
+		filtered := make([]chan<- bool, 0)
+		for _, tester := range g.buildCompleteListener {
+			if tester != c {
+				filtered = append(filtered, tester)
+			}
+		}
+		g.buildCompleteListener = filtered
+	}()
+
+	g.listerLock.Lock()
+	defer g.listerLock.Unlock()
+	g.buildCompleteListener = append(g.buildCompleteListener, c)
+}
+
+func (g *global) BuildSolution() {
+	if g.hasValidBuild {
+		g.emitBuildComplete(true)
+		return
+	}
+
 	execPath, err := g.exeBinding.Get()
 	if err != nil {
 		g.errBind.Set("Missing path to executable")
@@ -51,33 +105,7 @@ func (g *global) BuildSolution(complete func(), errFn func()) {
 		return
 	}
 
-	cmd := exec.Command(
-		execPath,
-		"--build-solutions",
-		"--path",
-		projectPath,
-		"--no-window",
-		"-v",
-		"-q",
-	)
-	if err := cmd.Start(); err != nil {
-		logrus.WithError(err).Error("error starting build")
-		g.errBind.Set("Unable to start build")
-		errFn()
-		return
-	}
-
-	go func() {
-		err := cmd.Wait()
-		if err != nil {
-			logrus.WithError(err).Error("error in build")
-			g.errBind.Set("Missing path to project")
-			errFn()
-			return
-		}
-
-		complete()
-	}()
+	g.buildCom.Invalid(execPath, projectPath)
 }
 
 func (g *global) Watcher(projectDir string) chan<- bool {
@@ -101,6 +129,7 @@ func (g *global) Watcher(projectDir string) chan<- bool {
 				}
 				if event.Op&(fsnotify.Create|fsnotify.Write) > 0 {
 					log.Println("modified file:", event.Name)
+					g.hasValidBuild = false
 					g.projectFileChangeHandler()
 				}
 			case err, ok := <-watcher.Errors:

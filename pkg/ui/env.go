@@ -73,6 +73,7 @@ func (e *env) start(completeFn func(), errorFn func(), restart func(bool)) {
 
 	if err := e.currentProcess.Run(); err != nil {
 		if e.restartNext {
+			e.restartNext = false
 			restart(false)
 		} else {
 			errorFn()
@@ -80,6 +81,7 @@ func (e *env) start(completeFn func(), errorFn func(), restart func(bool)) {
 		return
 	}
 	if e.restartNext {
+		e.restartNext = false
 		restart(true)
 	} else {
 		completeFn()
