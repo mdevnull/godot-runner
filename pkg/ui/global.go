@@ -1,7 +1,8 @@
 package ui
 
 import (
-	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -127,11 +128,42 @@ func (g *global) Watcher(projectDir string) chan<- bool {
 				if !ok {
 					return
 				}
-				if event.Op&(fsnotify.Create|fsnotify.Write) > 0 {
-					log.Println("modified file:", event.Name)
-					g.hasValidBuild = false
-					g.projectFileChangeHandler()
+				logrus.WithFields(logrus.Fields{
+					"target": event.Name,
+					"op":     event.Op.String(),
+				}).Info("received fsnotify event")
+
+				// I do not care about these events
+				if event.Op&fsnotify.Chmod == fsnotify.Chmod {
+					continue
 				}
+
+				// rename or delete events remove those from the watcher
+				// we do not know if the event trigger thingy was a file or dir
+				// guess we just have to call remove on watcher and hope it does not explode
+				if event.Op&(fsnotify.Remove|fsnotify.Rename) > 0 {
+					watcher.Remove(event.Name)
+					continue
+				}
+
+				fsInfo, err := os.Stat(event.Name)
+				if err != nil {
+					logrus.WithError(err).Error("unable to get stats of modified file/dir")
+					continue
+				}
+
+				// create ( also triggered for renames ) should add the new directory to the watcher
+				if fsInfo.IsDir() && event.Op == fsnotify.Create {
+					baseName := filepath.Base(event.Name)
+					if baseName[0:1] == "." {
+						continue
+					}
+					watcher.Add(event.Name)
+					continue
+				}
+
+				g.hasValidBuild = false
+				g.projectFileChangeHandler()
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -142,7 +174,31 @@ func (g *global) Watcher(projectDir string) chan<- bool {
 	}()
 
 	watcher.Add(projectDir)
+	AddRecusiveAllDirs(projectDir, watcher)
+
 	logrus.WithField("dir", projectDir).Info("watcher started")
 
 	return finishChan
+}
+
+func AddRecusiveAllDirs(dir string, watcher *fsnotify.Watcher) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"error": err,
+			"dir":   dir,
+		}).Error("unable to read directory")
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			if entry.Name()[0:1] == "." {
+				continue
+			}
+			fullPath := filepath.Join(dir, entry.Name())
+			watcher.Add(fullPath)
+			AddRecusiveAllDirs(fullPath, watcher)
+		}
+	}
 }
